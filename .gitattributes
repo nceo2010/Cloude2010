@@ -1,0 +1,51 @@
+# Normalize line endings: Git stores LF, checks out native on each platform.
+* text=auto
+
+# Source & config — always LF in the repo
+*.ts       text eol=lf
+*.tsx      text eol=lf
+*.js       text eol=lf
+*.jsx      text eol=lf
+*.mjs      text eol=lf
+*.cjs      text eol=lf
+*.json     text eol=lf
+*.css      text eol=lf
+*.scss     text eol=lf
+*.html     text eol=lf
+*.md       text eol=lf
+*.mdx      text eol=lf
+*.yml      text eol=lf
+*.yaml     text eol=lf
+*.sql      text eol=lf
+*.svg      text eol=lf
+*.env      text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Shell scripts must stay LF even on Windows checkouts
+*.sh       text eol=lf
+
+# Windows batch/PowerShell scripts want CRLF
+*.bat      text eol=crlf
+*.cmd      text eol=crlf
+*.ps1      text eol=crlf
+
+# Binary assets — never touch line endings or diff as text
+*.ico      binary
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.webp     binary
+*.avif     binary
+*.woff     binary
+*.woff2    binary
+*.ttf      binary
+*.eot      binary
+*.otf      binary
+*.pdf      binary
+
+# Lockfiles: keep LF, collapse diffs in review
+package-lock.json  text eol=lf -diff
+pnpm-lock.yaml     text eol=lf -diff
+yarn.lock          text eol=lf -diff
