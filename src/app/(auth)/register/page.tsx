@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { GoogleButton } from "@/components/auth/google-button";
 import { MagicLinkForm } from "@/components/auth/magic-link-form";
+import { PasswordRegisterForm } from "@/components/auth/password-register-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
@@ -21,16 +22,16 @@ export const metadata: Metadata = {
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; redirectTo?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, redirectTo } = await searchParams;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Create an account</CardTitle>
         <CardDescription>
-          Sign up with Google or a magic link — no password required.
+          Sign up with Google, email and password, or a magic link.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -41,6 +42,14 @@ export default async function RegisterPage({
         ) : null}
 
         <GoogleButton />
+
+        <div className="flex items-center gap-3">
+          <span className="bg-border h-px flex-1" />
+          <span className="text-muted-foreground text-xs uppercase">or</span>
+          <span className="bg-border h-px flex-1" />
+        </div>
+
+        <PasswordRegisterForm redirectTo={redirectTo} />
 
         <div className="flex items-center gap-3">
           <span className="bg-border h-px flex-1" />
