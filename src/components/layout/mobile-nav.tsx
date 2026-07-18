@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
 
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Button } from "@/components/ui/button";
 import { APP_NAME, appNav } from "@/lib/constants";
 import { routes } from "@/lib/routes";
@@ -13,7 +14,13 @@ import { cn } from "@/lib/utils";
  * Mobile navigation: a toggle button that reveals the app nav links.
  * Hidden on md+ where the sidebar takes over.
  */
-export function MobileNav({ className }: { className?: string }) {
+export function MobileNav({
+  className,
+  userEmail,
+}: {
+  className?: string;
+  userEmail?: string | null;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = React.useState(false);
 
@@ -59,6 +66,18 @@ export function MobileNav({ className }: { className?: string }) {
               </Link>
             );
           })}
+
+          <div className="mt-2 border-t pt-3">
+            {userEmail ? (
+              <p
+                className="text-muted-foreground mb-2 truncate px-3 text-xs"
+                title={userEmail}
+              >
+                {userEmail}
+              </p>
+            ) : null}
+            <SignOutButton />
+          </div>
         </nav>
       ) : null}
     </div>
