@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { GoogleButton } from "@/components/auth/google-button";
 import { MagicLinkForm } from "@/components/auth/magic-link-form";
+import { PasswordLoginForm } from "@/components/auth/password-login-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
@@ -21,9 +22,9 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; redirectTo?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, redirectTo } = await searchParams;
 
   return (
     <Card>
@@ -39,6 +40,14 @@ export default async function LoginPage({
         ) : null}
 
         <GoogleButton />
+
+        <div className="flex items-center gap-3">
+          <span className="bg-border h-px flex-1" />
+          <span className="text-muted-foreground text-xs uppercase">or</span>
+          <span className="bg-border h-px flex-1" />
+        </div>
+
+        <PasswordLoginForm redirectTo={redirectTo} />
 
         <div className="flex items-center gap-3">
           <span className="bg-border h-px flex-1" />
