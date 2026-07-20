@@ -21,6 +21,7 @@ export const marketingNav = [
 /** Sidebar navigation for the authenticated app shell. */
 export const appNav = [
   { label: "Dashboard", href: routes.dashboard },
+  { label: "Chat", href: routes.chat },
   { label: "Settings", href: routes.settings },
 ] as const;
 

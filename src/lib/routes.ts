@@ -17,6 +17,7 @@ export const routes = {
 
   // (app)
   dashboard: "/dashboard",
+  chat: "/chat",
   settings: "/settings",
 } as const;
 
@@ -24,7 +25,7 @@ export type RouteKey = keyof typeof routes;
 export type RoutePath = (typeof routes)[RouteKey];
 
 /** Path prefixes that live behind the authenticated app shell. */
-export const protectedPrefixes = ["/dashboard", "/settings"] as const;
+export const protectedPrefixes = ["/dashboard", "/chat", "/settings"] as const;
 
 /** Path prefixes that make up the auth flow. */
 export const authPrefixes = ["/login", "/register"] as const;

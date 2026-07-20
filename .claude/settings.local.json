@@ -4,7 +4,11 @@
       "PowerShell(npm run *)",
       "PowerShell(npm install *)",
       "PowerShell(Remove-Item *)",
-      "PowerShell(git config *)"
+      "PowerShell(git config *)",
+      "Bash(cat)",
+      "Bash(echo \"WRITE_EXIT=$?\")",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -Last 15; Write-Output \"TSC_EXIT=$LASTEXITCODE\")",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -Last 20; Write-Output \"TSC_EXIT=$LASTEXITCODE\")"
     ]
   }
 }

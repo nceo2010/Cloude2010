@@ -20,3 +20,24 @@ export type Goal = {
   created_at: string;
   updated_at: string;
 };
+
+/** Role of a chat message. */
+export type ChatRole = "user" | "assistant";
+
+/** Shape of a row in the `conversations` table. */
+export type Conversation = {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Shape of a row in the `messages` table. */
+export type Message = {
+  id: string;
+  conversation_id: string;
+  role: ChatRole;
+  content: string;
+  created_at: string;
+};
