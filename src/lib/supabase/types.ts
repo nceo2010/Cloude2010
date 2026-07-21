@@ -8,15 +8,19 @@ export type Profile = {
   updated_at: string;
 };
 
-/** Lifecycle status of a goal. */
-export type GoalStatus = "active" | "completed";
+/** Lifecycle status of a journey. */
+export type JourneyStatus = "active" | "completed";
 
-/** Shape of a row in the `goals` table. */
-export type Goal = {
+/** Shape of a row in the `journeys` table. */
+export type Journey = {
   id: string;
   user_id: string;
   title: string;
-  status: GoalStatus;
+  goal_description: string | null;
+  current_stage: string | null;
+  progress_percentage: number | null;
+  next_step: string | null;
+  status: JourneyStatus;
   created_at: string;
   updated_at: string;
 };
