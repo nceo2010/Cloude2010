@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getChatProvider } from "@/lib/ai/anthropic";
-import { formatGoalContext, retrieveRelevantGoals } from "@/lib/ai/goal-context";
+import { formatJourneyContext, retrieveRelevantJourney } from "@/lib/ai/journey-context";
 import { PROJECT_X_PERSONALITY } from "@/lib/ai/personality";
 import type { AiMessage } from "@/lib/ai/provider";
 import {
@@ -183,11 +183,11 @@ export async function POST(request: NextRequest): Promise<Response> {
     content: row.content,
   }));
 
-  // 6. Contextual goal retrieval keyed on the latest user message.
+  // 6. Contextual journey retrieval keyed on the latest user message.
   const lastUser = ordered.filter((row) => row.role === "user").at(-1);
-  const relevantGoals = await retrieveRelevantGoals(lastUser?.content ?? "");
-  const goalBlock = formatGoalContext(relevantGoals);
-  const system = [PROJECT_X_PERSONALITY, goalBlock]
+  const relevantJourneys = await retrieveRelevantJourney(lastUser?.content ?? "");
+  const journeyBlock = formatJourneyContext(relevantJourneys);
+  const system = [PROJECT_X_PERSONALITY, journeyBlock]
     .filter((part) => part.length > 0)
     .join("\n\n");
 

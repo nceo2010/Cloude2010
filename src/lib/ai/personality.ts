@@ -1,6 +1,6 @@
 /**
  * The Project X assistant personality. This is the base system prompt; the
- * chat route appends any relevant goal context (see `goal-context.ts`) after it.
+ * chat route appends any relevant journey context (see `journey-context.ts`) after it.
  */
 export const PROJECT_X_PERSONALITY = `You are the assistant for Project X, a personal-progress app.
 
