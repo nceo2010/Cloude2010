@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { CreateGoalForm } from "@/components/goals/create-goal-form";
-import { GoalCard } from "@/components/goals/goal-card";
+import { CreateJourneyForm } from "@/components/journeys/create-journey-form";
+import { JourneyCard } from "@/components/journeys/journey-card";
 import { PageHeader } from "@/components/layout/page-header";
 import {
   Card,
@@ -10,14 +10,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getActiveGoal } from "@/lib/goals/queries";
+import { getActiveJourney } from "@/lib/journeys/queries";
 
 export const metadata: Metadata = {
   title: "Dashboard",
 };
 
 export default async function DashboardPage() {
-  const goal = await getActiveGoal();
+  const journey = await getActiveJourney();
 
   return (
     <div className="space-y-6">
@@ -26,18 +26,18 @@ export default async function DashboardPage() {
         description="An overview of your progress."
       />
 
-      {goal ? (
-        <GoalCard goal={goal} />
+      {journey ? (
+        <JourneyCard journey={journey} />
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Create your goal</CardTitle>
+            <CardTitle>Create your journey</CardTitle>
             <CardDescription>
-              You don&apos;t have an active goal yet. Set one to get started.
+              You don&apos;t have an active journey yet. Set one to get started.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <CreateGoalForm />
+            <CreateJourneyForm />
           </CardContent>
         </Card>
       )}
