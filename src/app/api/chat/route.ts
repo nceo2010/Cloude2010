@@ -8,14 +8,14 @@ import type {
   JourneySuggestion,
   JourneySuggestionProposal,
 } from "@/lib/ai/provider";
+import { assembleConversationContext, formatConversationSummary } from "@/lib/chat/summary";
 import {
-  CONTEXT_WINDOW_SIZE,
   DEFAULT_CONVERSATION_TITLE,
   JOURNEY_SUGGESTION_MARKER,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/chat/types";
 import { createClient } from "@/lib/supabase/server";
-import type { ChatRole, Journey } from "@/lib/supabase/types";
+import type { Journey } from "@/lib/supabase/types";
 
 // Anthropic SDK + Supabase cookies require the Node runtime; never cache.
 export const runtime = "nodejs";
@@ -25,8 +25,6 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const TITLE_MAX = 80;
-
-type HistoryRow = { role: ChatRole; content: string };
 
 function errorResponse(
   status: number,
@@ -125,10 +123,12 @@ export async function POST(request: NextRequest): Promise<Response> {
   // 3. Resolve the conversation, always verifying ownership server-side — never
   //    trust the client-supplied id alone (RLS is a second line of defense).
   let convId: string;
+  let conversationSummary: string | null;
+  let conversationSummarizedCount: number;
   if (conversationId !== null) {
     const { data: convo, error } = await supabase
       .from("conversations")
-      .select("id, title")
+      .select("id, title, summary, summarized_message_count")
       .eq("id", conversationId)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -140,6 +140,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       return errorResponse(404, "Conversation not found.");
     }
     convId = convo.id as string;
+    conversationSummary = convo.summary as string | null;
+    conversationSummarizedCount = convo.summarized_message_count as number;
 
     // First real message in a still-default conversation → set its title.
     if (
@@ -158,13 +160,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     const { data: created, error } = await supabase
       .from("conversations")
       .insert({ user_id: user.id, title: deriveTitle(content as string) })
-      .select("id")
+      .select("id, summary, summarized_message_count")
       .single();
     if (error || !created) {
       console.error("chat: conversation create failed:", error);
       return errorResponse(500, "Something went wrong. Please try again.");
     }
     convId = created.id as string;
+    conversationSummary = created.summary as string | null;
+    conversationSummarizedCount = created.summarized_message_count as number;
   }
 
   // 4. Persist the user message (send mode only). Done BEFORE loading history so
@@ -179,33 +183,26 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
   }
 
-  // 5. Load the most recent CONTEXT_WINDOW_SIZE messages, then reverse to
-  //    chronological order for the model.
-  const { data: recent, error: historyError } = await supabase
-    .from("messages")
-    .select("role, content, created_at, id")
-    .eq("conversation_id", convId)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(CONTEXT_WINDOW_SIZE);
-  if (historyError) {
-    console.error("chat: history load failed:", historyError);
-    return errorResponse(500, "Something went wrong. Please try again.");
-  }
-
-  const ordered = ((recent as HistoryRow[] | null) ?? []).slice().reverse();
-  if (ordered.length === 0) {
+  // 5. Assemble chat context: the rolling summary plus every message not yet
+  //    folded into it — unsummarized overflow (if any), then the recent
+  //    window — chronological, nothing dropped. See assembleConversationContext
+  //    for how/when the summary itself gets updated.
+  const memory = await assembleConversationContext(supabase, {
+    id: convId,
+    summary: conversationSummary,
+    summarized_message_count: conversationSummarizedCount,
+  });
+  if (memory.messages.length === 0) {
     return errorResponse(400, "Nothing to respond to.");
   }
-  const messages: AiMessage[] = ordered.map((row) => ({
-    role: row.role,
-    content: row.content,
-  }));
+  const messages: AiMessage[] = memory.messages;
 
-  // 6. Always include the user's active Journey (if any) as read-only context.
+  // 6. System prompt, in order: base personality, Journey context (always
+  //    included when the user has an active Journey), conversation summary.
   const journey = await retrieveJourneyContext();
   const journeyBlock = formatJourneyContext(journey);
-  const system = [PROJECT_X_PERSONALITY, journeyBlock]
+  const summaryBlock = formatConversationSummary(memory.summary);
+  const system = [PROJECT_X_PERSONALITY, journeyBlock, summaryBlock]
     .filter((part) => part.length > 0)
     .join("\n\n");
 

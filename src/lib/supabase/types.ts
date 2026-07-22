@@ -33,6 +33,8 @@ export type Conversation = {
   id: string;
   user_id: string;
   title: string;
+  summary: string | null;
+  summarized_message_count: number;
   created_at: string;
   updated_at: string;
 };

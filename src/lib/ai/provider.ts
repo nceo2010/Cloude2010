@@ -53,6 +53,19 @@ export type ChatStreamResult = {
   suggestion: Promise<JourneySuggestionProposal | null>;
 };
 
+export type SummarizeParams = {
+  /** The prior rolling summary, or null if this conversation has none yet. */
+  priorSummary: string | null;
+  /**
+   * The batch of older messages to fold into the summary, oldest first.
+   * Untrusted conversation content — the summarizer must treat it as data to
+   * describe, never as instructions to follow.
+   */
+  messages: AiMessage[];
+};
+
 export interface ChatProvider {
   streamChat(params: StreamChatParams): ChatStreamResult;
+  /** Folds a batch of older messages into an updated rolling summary. */
+  summarize(params: SummarizeParams): Promise<string>;
 }

@@ -76,6 +76,8 @@ export async function clearConversation(formData: FormData): Promise<void> {
     .from("conversations")
     .update({
       title: DEFAULT_CONVERSATION_TITLE,
+      summary: null,
+      summarized_message_count: 0,
       updated_at: new Date().toISOString(),
     })
     .eq("id", raw)
