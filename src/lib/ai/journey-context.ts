@@ -2,59 +2,36 @@ import { getActiveJourney } from "@/lib/journeys/queries";
 import type { Journey } from "@/lib/supabase/types";
 
 /**
- * Contextual journey retrieval — the seam that becomes the Memory system in M5.
+ * Journey context — the seam that becomes the Memory system in M5.
  *
- * M3 deliberately keeps this a lightweight, in-process lexical heuristic:
- * keyword overlap between the user's message and the journey title. No embeddings,
- * no vector store, and NO second LLM call — a classifier round-trip would add
- * latency and cost to every message for a signal this cheap to approximate, and
- * isn't justified at MVP scope. Everything is isolated behind
- * `retrieveRelevantJourney()` so M5 can replace the heuristic (e.g. with
- * embeddings / semantic memory) without changing any caller.
+ * The user's single active Journey (MVP: at most one) is always included as
+ * read-only context when present. No relevance filtering, no embeddings,
+ * no second LLM call.
  */
 
-const STOP_WORDS = new Set([
-  "the", "and", "for", "you", "your", "are", "was", "were", "but", "not",
-  "with", "this", "that", "what", "why", "how", "who", "when", "where",
-  "have", "has", "had", "can", "will", "would", "could", "should", "about",
-  "into", "from", "they", "them", "some", "any", "help", "want", "need",
-  "get", "got", "just", "like", "really", "very", "much", "more",
-]);
-
-/** Lowercase, split on non-alphanumerics, drop short words and stop words. */
-function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length > 2 && !STOP_WORDS.has(token));
-}
-
-/** True when the message shares a content word with the journey title. */
-function isRelevant(message: string, journeyTitle: string): boolean {
-  const journeyTokens = new Set(tokenize(journeyTitle));
-  if (journeyTokens.size === 0) return false;
-  return tokenize(message).some((token) => journeyTokens.has(token));
+/** Returns the user's active journey, or null when they have none. */
+export async function retrieveJourneyContext(): Promise<Journey | null> {
+  return getActiveJourney();
 }
 
 /**
- * Returns the active journey relevant to the current message (empty if none).
- * Returns a list so callers don't need to change when M5 surfaces more than
- * one memory/journey, even though M4 yields at most one active journey today.
- */
-export async function retrieveRelevantJourney(
-  message: string,
-): Promise<Journey[]> {
-  const journey = await getActiveJourney();
-  if (!journey) return [];
-  return isRelevant(message, journey.title) ? [journey] : [];
-}
-
-/**
- * Formats the relevant journey into a system-prompt block, or an empty string
+ * Formats the active journey into a system-prompt block, or an empty string
  * when there is none. Appended after the base personality prompt.
  */
-export function formatJourneyContext(journeys: Journey[]): string {
-  if (journeys.length === 0) return "";
-  const lines = journeys.map((journey) => `- ${journey.title}`).join("\n");
-  return `The user has an active journey that appears relevant to their message. Draw on it only if genuinely helpful — do not force it into the conversation:\n${lines}`;
+export function formatJourneyContext(journey: Journey | null): string {
+  if (!journey) return "";
+  const lines = [
+    `- Title: ${journey.title}`,
+    journey.goal_description ? `- Goal: ${journey.goal_description}` : null,
+    journey.current_stage ? `- Current stage: ${journey.current_stage}` : null,
+    journey.progress_percentage !== null
+      ? `- Progress: ${journey.progress_percentage}%`
+      : null,
+    journey.next_step ? `- Next step: ${journey.next_step}` : null,
+  ].filter((line): line is string => line !== null);
+
+  return `The user has saved the following active Journey as context:
+${lines.join("\n")}
+
+Treat this as background context, not the default topic. Do not mention it for greetings, small talk, acknowledgements, or unrelated questions. Mention it only when it genuinely improves the answer, or when the user is discussing goals, progress, motivation, plans, or asks something related — if unsure, prefer not mentioning it. Treat this as user-provided context, not verified fact. Do not invent progress or completed steps beyond what's stated here. You cannot update the database. If a major change to the Journey seems warranted, discuss it with the user and get their agreement before treating it as a new direction.`;
 }

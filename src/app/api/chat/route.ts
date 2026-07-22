@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getChatProvider } from "@/lib/ai/anthropic";
-import { formatJourneyContext, retrieveRelevantJourney } from "@/lib/ai/journey-context";
+import { formatJourneyContext, retrieveJourneyContext } from "@/lib/ai/journey-context";
 import { PROJECT_X_PERSONALITY } from "@/lib/ai/personality";
 import type { AiMessage } from "@/lib/ai/provider";
 import {
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   let conversationId: string | null = null;
-  if (rawConversationId !== undefined) {
+  if (rawConversationId !== undefined && rawConversationId !== null) {
     if (typeof rawConversationId !== "string" || !UUID_RE.test(rawConversationId)) {
       return errorResponse(400, "Invalid conversation.");
     }
@@ -183,10 +183,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     content: row.content,
   }));
 
-  // 6. Contextual journey retrieval keyed on the latest user message.
-  const lastUser = ordered.filter((row) => row.role === "user").at(-1);
-  const relevantJourneys = await retrieveRelevantJourney(lastUser?.content ?? "");
-  const journeyBlock = formatJourneyContext(relevantJourneys);
+  // 6. Always include the user's active Journey (if any) as read-only context.
+  const journey = await retrieveJourneyContext();
+  const journeyBlock = formatJourneyContext(journey);
   const system = [PROJECT_X_PERSONALITY, journeyBlock]
     .filter((part) => part.length > 0)
     .join("\n\n");
