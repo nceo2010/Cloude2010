@@ -3,14 +3,19 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getChatProvider } from "@/lib/ai/anthropic";
 import { formatJourneyContext, retrieveJourneyContext } from "@/lib/ai/journey-context";
 import { PROJECT_X_PERSONALITY } from "@/lib/ai/personality";
-import type { AiMessage } from "@/lib/ai/provider";
+import type {
+  AiMessage,
+  JourneySuggestion,
+  JourneySuggestionProposal,
+} from "@/lib/ai/provider";
 import {
   CONTEXT_WINDOW_SIZE,
   DEFAULT_CONVERSATION_TITLE,
+  JOURNEY_SUGGESTION_MARKER,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/chat/types";
 import { createClient } from "@/lib/supabase/server";
-import type { ChatRole } from "@/lib/supabase/types";
+import type { ChatRole, Journey } from "@/lib/supabase/types";
 
 // Anthropic SDK + Supabase cookies require the Node runtime; never cache.
 export const runtime = "nodejs";
@@ -44,6 +49,20 @@ function isAbortError(error: unknown): boolean {
 function deriveTitle(content: string): string {
   const title = content.trim().replace(/\s+/g, " ").slice(0, TITLE_MAX).trim();
   return title.length > 0 ? title : DEFAULT_CONVERSATION_TITLE;
+}
+
+/** Enriches a model-proposed suggestion with server-known facts (never taken
+ *  from model input): the journey it targets and its current field value. */
+function buildJourneySuggestion(
+  proposal: JourneySuggestionProposal,
+  journey: Journey,
+): JourneySuggestion {
+  return {
+    journeyId: journey.id,
+    field: proposal.field,
+    oldValue: journey[proposal.field],
+    suggestedValue: proposal.suggestedValue,
+  };
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -194,12 +213,17 @@ export async function POST(request: NextRequest): Promise<Response> {
   //    failure (or empty completion) before any text becomes a proper HTTP
   //    status instead of a broken stream. The user message is already saved, so
   //    the client can retry (regenerate) cleanly.
+  const chatStream = getChatProvider().streamChat({
+    system,
+    messages,
+    signal: request.signal,
+    allowJourneySuggestion: journey !== null,
+  });
+
   let iterator: AsyncIterator<string>;
   let first: IteratorResult<string>;
   try {
-    iterator = getChatProvider()
-      .streamChat({ system, messages, signal: request.signal })
-      [Symbol.asyncIterator]();
+    iterator = chatStream.text[Symbol.asyncIterator]();
     first = await iterator.next();
   } catch (error) {
     if (isAbortError(error) || request.signal.aborted) {
@@ -245,6 +269,17 @@ export async function POST(request: NextRequest): Promise<Response> {
           controller.enqueue(encoder.encode(next.value));
         }
         completedSuccessfully = true;
+
+        // Journey Memory Suggestion: sent as a trailing out-of-band chunk,
+        // never mixed into `full` — it must never reach message persistence.
+        const proposal = await chatStream.suggestion;
+        const suggestion =
+          journey && proposal ? buildJourneySuggestion(proposal, journey) : null;
+        if (suggestion) {
+          controller.enqueue(
+            encoder.encode(JOURNEY_SUGGESTION_MARKER + JSON.stringify(suggestion)),
+          );
+        }
       } catch (error) {
         if (!isAbortError(error) && !request.signal.aborted) {
           console.error("chat: stream error:", error);

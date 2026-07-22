@@ -7,7 +7,12 @@ import { MessageList } from "@/components/chat/message-list";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { clearConversation, createConversation } from "@/lib/chat/actions";
-import type { ChatMessage } from "@/lib/chat/types";
+import {
+  JOURNEY_SUGGESTION_MARKER,
+  parseJourneySuggestionPayload,
+  safeRenderLength,
+  type ChatMessage,
+} from "@/lib/chat/types";
 
 type ChatWindowProps = {
   conversationId: string | null;
@@ -93,18 +98,49 @@ export function ChatWindow({
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let accumulated = "";
+        // -1 until the marker is found; a stream chunk can split the marker
+        // itself, so the tail of `accumulated` is held back from rendering
+        // whenever it might be an in-progress prefix of it.
+        let markerIndex = -1;
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
           accumulated += decoder.decode(value, { stream: true });
+
+          if (markerIndex === -1) {
+            markerIndex = accumulated.indexOf(JOURNEY_SUGGESTION_MARKER);
+          }
+
+          const visible =
+            markerIndex === -1
+              ? accumulated.slice(
+                  0,
+                  safeRenderLength(accumulated, JOURNEY_SUGGESTION_MARKER),
+                )
+              : accumulated.slice(0, markerIndex);
+
           setMessages((prev) =>
             prev.map((message) =>
               message.id === assistantId
-                ? { ...message, content: accumulated }
+                ? { ...message, content: visible }
                 : message,
             ),
           );
         }
+
+        if (markerIndex !== -1) {
+          const suggestion = parseJourneySuggestionPayload(
+            accumulated.slice(markerIndex + JOURNEY_SUGGESTION_MARKER.length),
+          );
+          if (suggestion) {
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === assistantId ? { ...message, suggestion } : message,
+              ),
+            );
+          }
+        }
+
         setStatus("idle");
       } catch (caught) {
         // Drop an empty placeholder bubble; keep any partial text that streamed.
