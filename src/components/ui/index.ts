@@ -8,6 +8,7 @@ export {
   CardFooter,
 } from "./card";
 export { Input, type InputProps } from "./input";
+export { ProgressBar, type ProgressBarProps } from "./progress-bar";
 export { Label, type LabelProps } from "./label";
 export { Alert, AlertTitle, AlertDescription, type AlertProps } from "./alert";
 export { LoadingState, type LoadingStateProps } from "./loading-state";

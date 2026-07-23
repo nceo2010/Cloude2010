@@ -219,10 +219,12 @@ export function ChatWindow({
   }
 
   return (
-    <div className="bg-card flex h-[70dvh] min-h-96 flex-col rounded-lg border">
-      <div className="flex items-center justify-between border-b p-3">
-        <span className="text-sm font-medium">Assistant</span>
-        <div className="flex gap-2">
+    <div className="border-border/60 bg-card flex h-[70dvh] min-h-96 flex-col rounded-2xl border shadow-sm dark:shadow-none">
+      <div className="border-border/60 flex items-center justify-between border-b px-5 py-4">
+        <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+          Assistant
+        </span>
+        <div className="flex gap-1">
           <Button
             variant="ghost"
             size="sm"
@@ -237,7 +239,7 @@ export function ChatWindow({
             onClick={handleClear}
             disabled={streaming || messages.length === 0}
           >
-            Clear
+            Clear chat
           </Button>
         </div>
       </div>
@@ -254,7 +256,7 @@ export function ChatWindow({
       />
 
       {status === "error" && error ? (
-        <div className="border-t px-4 py-2">
+        <div className="border-border/60 border-t px-4 py-2">
           <Alert variant="destructive">
             <AlertDescription className="flex items-center justify-between gap-3">
               <span>{error}</span>
@@ -267,7 +269,7 @@ export function ChatWindow({
       ) : null}
 
       {streaming ? (
-        <div className="flex justify-end border-t px-4 py-2">
+        <div className="border-border/60 flex justify-end border-t px-4 py-2">
           <Button variant="ghost" size="sm" onClick={handleStop}>
             Stop
           </Button>

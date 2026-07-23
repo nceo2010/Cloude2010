@@ -40,3 +40,32 @@ export async function getActiveJourney(): Promise<Journey | null> {
 
   return (data as Journey | null) ?? null;
 }
+
+/**
+ * Returns how many of the current user's journeys have been marked completed.
+ * Used as a lightweight "progress so far" stat — there is no separate steps
+ * table in the MVP schema, so a completed Journey is the closest real unit of
+ * accomplishment we can count. Returns 0 on any error rather than throwing:
+ * this backs a small dashboard stat, not a page's core content.
+ */
+export async function getCompletedJourneyCount(): Promise<number> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return 0;
+
+  const { count, error } = await supabase
+    .from("journeys")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("status", "completed");
+
+  if (error) {
+    console.error("getCompletedJourneyCount query failed:", error);
+    return 0;
+  }
+
+  return count ?? 0;
+}

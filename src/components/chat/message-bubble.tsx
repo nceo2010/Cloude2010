@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { SpeakerIcon, StopCircleIcon } from "@/components/chat/icons";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { SpeechSynthesisState } from "@/hooks/use-speech-synthesis";
@@ -48,18 +49,23 @@ function JourneySuggestionCard({ suggestion }: { suggestion: JourneySuggestion }
 
   if (state.status === "success") {
     return (
-      <div className="text-muted-foreground mt-2 max-w-[85%] rounded-lg border px-3 py-2 text-xs sm:max-w-[75%]">
+      <div className="border-border/60 text-muted-foreground mt-2 max-w-[85%] rounded-2xl border px-4 py-3 text-xs sm:max-w-[70%]">
         Journey updated.
       </div>
     );
   }
 
   return (
-    <div className="bg-card mt-2 max-w-[85%] space-y-2 rounded-lg border px-3 py-2 text-xs sm:max-w-[75%]">
-      <div className="font-medium">Suggested Journey update</div>
-      <div className="text-muted-foreground">
-        {FIELD_LABELS[suggestion.field]}:{" "}
-        {formatSuggestionValue(suggestion.field, suggestion.oldValue)} →{" "}
+    <div className="border-border/60 bg-card mt-2 max-w-[85%] space-y-3 rounded-2xl border px-4 py-3 text-xs sm:max-w-[70%]">
+      <div className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+        Suggested Journey update
+      </div>
+      <div className="text-sm">
+        <span className="text-muted-foreground">
+          {FIELD_LABELS[suggestion.field]}:{" "}
+        </span>
+        {formatSuggestionValue(suggestion.field, suggestion.oldValue)}
+        <span className="text-muted-foreground"> → </span>
         {formatSuggestionValue(suggestion.field, suggestion.suggestedValue)}
       </div>
       {state.status === "error" && state.message ? (
@@ -141,10 +147,10 @@ export function MessageBubble({
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div
         className={cn(
-          "max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap sm:max-w-[75%]",
+          "rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
           isUser
-            ? "bg-primary text-primary-foreground"
-            : "bg-card text-card-foreground border",
+            ? "max-w-[85%] sm:max-w-[75%] bg-primary text-primary-foreground"
+            : "border-border/60 bg-card text-card-foreground max-w-[85%] border sm:max-w-[70%]",
         )}
       >
         {text}
@@ -156,23 +162,25 @@ export function MessageBubble({
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={onStopSpeaking}
               aria-pressed={true}
               aria-label="Stop reading this message aloud"
+              className="text-muted-foreground hover:text-foreground h-7 w-7"
             >
-              Stop
+              <StopCircleIcon className="size-4" />
             </Button>
           ) : (
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => onReadAloud(message.id, message.content)}
               aria-pressed={false}
               aria-label="Read this message aloud"
+              className="text-muted-foreground hover:text-foreground h-7 w-7"
             >
-              Read aloud
+              <SpeakerIcon className="size-4" />
             </Button>
           )}
         </div>
@@ -181,7 +189,7 @@ export function MessageBubble({
       {hasSpeechError && speechError ? (
         <Alert
           variant="destructive"
-          className="mt-1 max-w-[85%] sm:max-w-[75%]"
+          className="mt-1 max-w-[85%] sm:max-w-[70%]"
         >
           <AlertDescription>{speechError}</AlertDescription>
         </Alert>

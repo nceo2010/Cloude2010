@@ -40,6 +40,42 @@ export async function getCurrentConversation(): Promise<Conversation | null> {
 }
 
 /**
+ * Returns a specific conversation the user owns, or null if it doesn't exist
+ * or isn't theirs (never thrown as an error — an unknown/foreign id should
+ * degrade gracefully, not break the page). Auth is verified via getUser(); a
+ * DB or auth-service error is logged and rethrown rather than swallowed.
+ */
+export async function getConversationById(
+  id: string,
+): Promise<Conversation | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError) {
+    console.error("getConversationById auth check failed:", authError);
+    throw new Error("Failed to load your conversation.");
+  }
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .select(CONVERSATION_COLUMNS)
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getConversationById query failed:", error);
+    throw new Error("Failed to load your conversation.");
+  }
+
+  return (data as Conversation | null) ?? null;
+}
+
+/**
  * Returns the messages for a conversation the user owns, in deterministic
  * order (created_at asc, then id asc as a tiebreaker). RLS gates ownership;
  * an unowned or unknown conversation id simply yields an empty list.
@@ -70,4 +106,36 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
   }
 
   return (data as Message[] | null) ?? [];
+}
+
+/**
+ * Returns the user's most recently active conversations (most recent first),
+ * for a lightweight "recent conversations" list. Same ownership/RLS scoping
+ * as `getCurrentConversation`; returns [] on error rather than throwing, since
+ * this backs a secondary dashboard widget, not a page's core content.
+ */
+export async function getRecentConversations(
+  limit: number,
+): Promise<Conversation[]> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .select(CONVERSATION_COLUMNS)
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("getRecentConversations query failed:", error);
+    return [];
+  }
+
+  return (data as Conversation[] | null) ?? [];
 }

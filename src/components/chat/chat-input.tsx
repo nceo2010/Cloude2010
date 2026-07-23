@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { MicIcon } from "@/components/chat/icons";
 import { VoicePrivacyNotice } from "@/components/chat/voice-privacy-notice";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -106,7 +107,7 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
   }
 
   return (
-    <div className="border-t p-3">
+    <div className="border-border/60 border-t p-4">
       <div className="flex items-end gap-2">
         <textarea
           value={value}
@@ -158,6 +159,7 @@ export function ChatInput({ disabled, onSend }: ChatInputProps) {
               disabled={disabled}
               aria-label="Start voice input"
             >
+              <MicIcon className="size-4" />
               Voice
             </Button>
           )

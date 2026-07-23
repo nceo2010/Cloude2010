@@ -36,7 +36,7 @@ export function MessageList({
   }, [messages, streaming]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4">
+    <div className="flex-1 overflow-y-auto p-5 sm:p-6">
       {messages.length === 0 ? (
         <div className="flex h-full items-center justify-center">
           <EmptyState
@@ -45,7 +45,7 @@ export function MessageList({
           />
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {messages.map((message, index) => (
             <MessageBubble
               key={message.id}

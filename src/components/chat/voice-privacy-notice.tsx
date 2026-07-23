@@ -68,7 +68,7 @@ export function VoicePrivacyNotice({
         aria-modal="true"
         aria-labelledby={TITLE_ID}
         aria-describedby={DESCRIPTION_ID}
-        className="w-full max-w-sm"
+        className="border-border/60 w-full max-w-sm rounded-2xl shadow-sm dark:shadow-none"
         onClick={(event) => event.stopPropagation()}
       >
         <CardHeader>
