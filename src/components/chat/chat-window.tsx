@@ -6,6 +6,7 @@ import { ChatInput } from "@/components/chat/chat-input";
 import { MessageList } from "@/components/chat/message-list";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useSpeechSynthesis } from "@/hooks/use-speech-synthesis";
 import { clearConversation, createConversation } from "@/lib/chat/actions";
 import {
   JOURNEY_SUGGESTION_MARKER,
@@ -43,10 +44,22 @@ export function ChatWindow({
   const [error, setError] = React.useState<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
 
+  const {
+    state: speechState,
+    speakingMessageId,
+    error: speechError,
+    isSupported: speechSupported,
+    speak: speakMessage,
+    stop: stopSpeaking,
+  } = useSpeechSynthesis();
+
   const streaming = status === "streaming";
 
   const runStream = React.useCallback(
     async (opts: { content: string | null }) => {
+      // A new assistant response is about to start — never let a previous
+      // message keep speaking underneath it.
+      stopSpeaking();
       setError(null);
       setStatus("streaming");
 
@@ -160,7 +173,7 @@ export function ChatWindow({
         abortRef.current = null;
       }
     },
-    [convId],
+    [convId, stopSpeaking],
   );
 
   function handleSend(text: string) {
@@ -184,6 +197,7 @@ export function ChatWindow({
 
   async function handleNew() {
     if (streaming) return;
+    stopSpeaking();
     const id = await createConversation();
     setConvId(id);
     setMessages([]);
@@ -193,6 +207,7 @@ export function ChatWindow({
 
   async function handleClear() {
     if (streaming) return;
+    stopSpeaking();
     if (convId) {
       const formData = new FormData();
       formData.set("conversationId", convId);
@@ -227,7 +242,16 @@ export function ChatWindow({
         </div>
       </div>
 
-      <MessageList messages={messages} streaming={streaming} />
+      <MessageList
+        messages={messages}
+        streaming={streaming}
+        speechState={speechState}
+        speakingMessageId={speakingMessageId}
+        speechError={speechError}
+        speechSupported={speechSupported}
+        onReadAloud={speakMessage}
+        onStopSpeaking={stopSpeaking}
+      />
 
       {status === "error" && error ? (
         <div className="border-t px-4 py-2">

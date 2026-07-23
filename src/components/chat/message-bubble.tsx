@@ -2,7 +2,9 @@
 
 import * as React from "react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import type { SpeechSynthesisState } from "@/hooks/use-speech-synthesis";
 import type { JourneySuggestion } from "@/lib/ai/provider";
 import type { ChatMessage } from "@/lib/chat/types";
 import { applyJourneySuggestion } from "@/lib/journeys/actions";
@@ -89,10 +91,34 @@ function JourneySuggestionCard({ suggestion }: { suggestion: JourneySuggestion }
   );
 }
 
+type MessageBubbleProps = {
+  message: ChatMessage;
+  /** True only for the last assistant message while it is still streaming —
+   *  its text is a moving target, so the voice control is hidden for it. */
+  isStreamingMessage: boolean;
+  speechSupported: boolean;
+  speechState: SpeechSynthesisState;
+  speakingMessageId: string | null;
+  speechError: string | null;
+  onReadAloud: (messageId: string, text: string) => void;
+  onStopSpeaking: () => void;
+};
+
 /** A single chat message. Assistant bubbles show "Thinking…" until the first
  *  streamed token arrives. An assistant reply may carry a Journey Memory
- *  Suggestion, rendered as its own card below the bubble. */
-export function MessageBubble({ message }: { message: ChatMessage }) {
+ *  Suggestion, rendered as its own card below the bubble, and (once fully
+ *  streamed) a Read-aloud/Stop voice control. User messages never get a
+ *  voice control. */
+export function MessageBubble({
+  message,
+  isStreamingMessage,
+  speechSupported,
+  speechState,
+  speakingMessageId,
+  speechError,
+  onReadAloud,
+  onStopSpeaking,
+}: MessageBubbleProps) {
   const isUser = message.role === "user";
   const text =
     message.content.length > 0
@@ -100,6 +126,16 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
       : isUser
         ? ""
         : "Thinking…";
+
+  const isSpeakingThis =
+    speakingMessageId === message.id && speechState === "speaking";
+  const hasSpeechError =
+    speakingMessageId === message.id && speechState === "error";
+  const showVoiceControl =
+    !isUser &&
+    speechSupported &&
+    !isStreamingMessage &&
+    message.content.trim().length > 0;
 
   return (
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
@@ -113,6 +149,44 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
       >
         {text}
       </div>
+
+      {showVoiceControl ? (
+        <div className="mt-1">
+          {isSpeakingThis ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onStopSpeaking}
+              aria-pressed={true}
+              aria-label="Stop reading this message aloud"
+            >
+              Stop
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onReadAloud(message.id, message.content)}
+              aria-pressed={false}
+              aria-label="Read this message aloud"
+            >
+              Read aloud
+            </Button>
+          )}
+        </div>
+      ) : null}
+
+      {hasSpeechError && speechError ? (
+        <Alert
+          variant="destructive"
+          className="mt-1 max-w-[85%] sm:max-w-[75%]"
+        >
+          <AlertDescription>{speechError}</AlertDescription>
+        </Alert>
+      ) : null}
+
       {message.suggestion ? (
         <JourneySuggestionCard suggestion={message.suggestion} />
       ) : null}
