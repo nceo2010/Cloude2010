@@ -255,12 +255,21 @@ export async function POST(request: NextRequest): Promise<Response> {
     );
   }
   if (first.done && !first.value) {
-    console.error("chat: provider returned no content");
-    return errorResponse(
-      502,
-      "The assistant is unavailable right now. Please try again.",
-      convId,
-    );
+    // A reply consisting ONLY of tool calls with no text is a legitimate,
+    // successful model turn (e.g. a short stated fact often gets logged via
+    // save_memory with nothing else to say) — not a provider failure. `first`
+    // being done here means the generator already ran to completion, so
+    // chatStream.actions is already resolved; only treat this as unavailable
+    // when the reply truly has nothing in it: no text AND no actions.
+    const proposalsOnEmptyText = await chatStream.actions;
+    if (proposalsOnEmptyText.length === 0) {
+      console.error("chat: provider returned no content");
+      return errorResponse(
+        502,
+        "The assistant is unavailable right now. Please try again.",
+        convId,
+      );
+    }
   }
 
   // 8. Stream the reply. Persist the assistant message ONLY when the stream
