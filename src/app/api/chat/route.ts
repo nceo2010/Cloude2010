@@ -2,20 +2,24 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getChatProvider } from "@/lib/ai/anthropic";
 import { formatJourneyContext, retrieveJourneyContext } from "@/lib/ai/journey-context";
+import { formatMemoryContext, retrieveMemoryContext } from "@/lib/ai/memory-context";
 import { PROJECT_X_PERSONALITY } from "@/lib/ai/personality";
 import type {
+  ActionProposal,
   AiMessage,
+  ChatAction,
   JourneySuggestion,
-  JourneySuggestionProposal,
 } from "@/lib/ai/provider";
 import { assembleConversationContext, formatConversationSummary } from "@/lib/chat/summary";
 import {
+  ACTION_MARKER,
   DEFAULT_CONVERSATION_TITLE,
-  JOURNEY_SUGGESTION_MARKER,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/chat/types";
+import { createMemory, getMemoryForUpdate } from "@/lib/memories/service";
+import { computeRequiresConfirmation } from "@/lib/memories/types";
 import { createClient } from "@/lib/supabase/server";
-import type { Journey } from "@/lib/supabase/types";
+import type { Journey, Memory } from "@/lib/supabase/types";
 
 // Anthropic SDK + Supabase cookies require the Node runtime; never cache.
 export const runtime = "nodejs";
@@ -52,10 +56,11 @@ function deriveTitle(content: string): string {
 /** Enriches a model-proposed suggestion with server-known facts (never taken
  *  from model input): the journey it targets and its current field value. */
 function buildJourneySuggestion(
-  proposal: JourneySuggestionProposal,
+  proposal: Extract<ActionProposal, { kind: "journey_update" }>,
   journey: Journey,
 ): JourneySuggestion {
   return {
+    kind: "journey_update",
     journeyId: journey.id,
     field: proposal.field,
     oldValue: journey[proposal.field],
@@ -198,11 +203,25 @@ export async function POST(request: NextRequest): Promise<Response> {
   const messages: AiMessage[] = memory.messages;
 
   // 6. System prompt, in order: base personality, Journey context (always
-  //    included when the user has an active Journey), conversation summary.
+  //    included when the user has an active Journey), Memory context,
+  //    conversation summary. Memory retrieval is best-effort: a lookup
+  //    failure is logged and degrades to no Memory context for this turn
+  //    rather than failing the whole request (unlike Journey/conversation
+  //    lookups elsewhere in this route, which do fail the request — Memory
+  //    context is enrichment, not something the turn depends on).
   const journey = await retrieveJourneyContext();
   const journeyBlock = formatJourneyContext(journey);
+
+  let memories: Memory[] = [];
+  try {
+    memories = await retrieveMemoryContext();
+  } catch (error) {
+    console.error("chat: memory context retrieval failed:", error);
+  }
+  const memoryBlock = formatMemoryContext(memories);
+
   const summaryBlock = formatConversationSummary(memory.summary);
-  const system = [PROJECT_X_PERSONALITY, journeyBlock, summaryBlock]
+  const system = [PROJECT_X_PERSONALITY, journeyBlock, memoryBlock, summaryBlock]
     .filter((part) => part.length > 0)
     .join("\n\n");
 
@@ -267,14 +286,87 @@ export async function POST(request: NextRequest): Promise<Response> {
         }
         completedSuccessfully = true;
 
-        // Journey Memory Suggestion: sent as a trailing out-of-band chunk,
-        // never mixed into `full` — it must never reach message persistence.
-        const proposal = await chatStream.suggestion;
-        const suggestion =
-          journey && proposal ? buildJourneySuggestion(proposal, journey) : null;
-        if (suggestion) {
+        // Structured actions: sent as a trailing out-of-band chunk, never
+        // mixed into `full` — they must never reach message persistence.
+        // Processed in the same order the provider returned them, which is
+        // already capped there (KIND_CAPS in anthropic.ts: at most 1
+        // journey_update, 3 memory_save, 1 memory_update, 5 total) — this
+        // loop preserves that order and those caps rather than re-deriving
+        // them.
+        const proposals = await chatStream.actions;
+        const actions: ChatAction[] = [];
+        for (const proposal of proposals) {
+          if (proposal.kind === "journey_update") {
+            if (journey) {
+              actions.push(buildJourneySuggestion(proposal, journey));
+            }
+            continue;
+          }
+
+          if (proposal.kind === "memory_save") {
+            // The model's `sensitive` flag is one input, never the final
+            // word — the server recomputes the actual policy from
+            // origin + sensitive + type (see computeRequiresConfirmation).
+            const requiresConfirmation = computeRequiresConfirmation(
+              proposal.origin,
+              proposal.sensitive,
+              proposal.type,
+            );
+            if (requiresConfirmation) {
+              actions.push({
+                kind: "memory_save_confirm",
+                type: proposal.type,
+                content: proposal.content,
+                origin: proposal.origin,
+                sensitive: proposal.sensitive,
+              });
+              continue;
+            }
+
+            // createMemory throws rather than returning null on failure —
+            // caught here so a failed automatic save skips only this one
+            // action. Never fail the chat turn over a side-effect that
+            // already streamed successfully to the user.
+            try {
+              const saved = await createMemory(supabase, user.id, {
+                type: proposal.type,
+                content: proposal.content,
+                origin: proposal.origin,
+                conversationId: convId,
+              });
+              actions.push({
+                kind: "memory_saved",
+                memoryId: saved.id,
+                type: saved.type,
+                content: saved.content,
+              });
+            } catch (error) {
+              console.error("chat: automatic memory save failed, skipping action:", error);
+            }
+            continue;
+          }
+
+          // memory_update: always requires confirmation, never applied here.
+          // Fetch the target fresh from the DB — never trust the model's
+          // implicit idea of the current content — scoped to this user. A
+          // missing or foreign id (stale context, or a model-invented id) is
+          // dropped silently rather than surfaced as an error.
+          const target = await getMemoryForUpdate(supabase, user.id, proposal.memoryId);
+          if (!target) continue;
+
+          actions.push({
+            kind: "memory_update_confirm",
+            memoryId: target.id,
+            type: target.type,
+            oldContent: target.content,
+            newContent: proposal.newContent,
+            origin: proposal.origin,
+          });
+        }
+
+        if (actions.length > 0) {
           controller.enqueue(
-            encoder.encode(JOURNEY_SUGGESTION_MARKER + JSON.stringify(suggestion)),
+            encoder.encode(ACTION_MARKER + JSON.stringify(actions)),
           );
         }
       } catch (error) {

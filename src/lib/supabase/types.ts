@@ -1,3 +1,5 @@
+import type { MemoryOrigin, MemoryType } from "@/lib/memories/types";
+
 /** Shape of a row in the `profiles` table. */
 export type Profile = {
   id: string;
@@ -46,4 +48,21 @@ export type Message = {
   role: ChatRole;
   content: string;
   created_at: string;
+};
+
+/** Where a memory originated. Always "chat" today — "manual" is reserved for a future manual-entry path. */
+export type MemorySource = "chat" | "manual";
+
+/** Shape of a row in the `user_memories` table. */
+export type Memory = {
+  id: string;
+  user_id: string;
+  type: MemoryType;
+  content: string;
+  origin: MemoryOrigin;
+  source: MemorySource;
+  conversation_id: string | null;
+  created_at: string;
+  updated_at: string;
+  last_used_at: string;
 };

@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { SpeakerIcon, StopCircleIcon } from "@/components/chat/icons";
+import { MemoryActionCard } from "@/components/chat/memory-action-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { SpeechSynthesisState } from "@/hooks/use-speech-synthesis";
@@ -102,6 +103,10 @@ type MessageBubbleProps = {
   /** True only for the last assistant message while it is still streaming —
    *  its text is a moving target, so the voice control is hidden for it. */
   isStreamingMessage: boolean;
+  /** The current conversation's id, threaded down to a memory_save_confirm
+   *  card so a confirmed save records its originating conversation, same as
+   *  an automatic save already does. */
+  conversationId: string | null;
   speechSupported: boolean;
   speechState: SpeechSynthesisState;
   speakingMessageId: string | null;
@@ -111,13 +116,15 @@ type MessageBubbleProps = {
 };
 
 /** A single chat message. Assistant bubbles show "Thinking…" until the first
- *  streamed token arrives. An assistant reply may carry a Journey Memory
- *  Suggestion, rendered as its own card below the bubble, and (once fully
- *  streamed) a Read-aloud/Stop voice control. User messages never get a
- *  voice control. */
+ *  streamed token arrives. An assistant reply may carry zero or more
+ *  structured actions (a Journey update suggestion, and/or Memory save/
+ *  update cards), each rendered as its own card below the bubble, and (once
+ *  fully streamed) a Read-aloud/Stop voice control. User messages never get
+ *  a voice control. */
 export function MessageBubble({
   message,
   isStreamingMessage,
+  conversationId,
   speechSupported,
   speechState,
   speakingMessageId,
@@ -195,9 +202,20 @@ export function MessageBubble({
         </Alert>
       ) : null}
 
-      {message.suggestion ? (
-        <JourneySuggestionCard suggestion={message.suggestion} />
-      ) : null}
+      {message.actions?.map((action) => {
+        if (action.kind === "journey_update") {
+          return (
+            <JourneySuggestionCard key={`${message.id}-journey_update`} suggestion={action} />
+          );
+        }
+        // memory_save_confirm has no memoryId yet (nothing's been written);
+        // every other kind refers to a real row, so its id is a stable key.
+        const key =
+          action.kind === "memory_save_confirm"
+            ? `${message.id}-memory_save_confirm-${action.type}`
+            : `${message.id}-${action.kind}-${action.memoryId}`;
+        return <MemoryActionCard key={key} action={action} conversationId={conversationId} />;
+      })}
     </div>
   );
 }

@@ -10,6 +10,8 @@ import type { ChatMessage } from "@/lib/chat/types";
 type MessageListProps = {
   messages: ChatMessage[];
   streaming: boolean;
+  /** Threaded down to each MessageBubble for memory_save_confirm's conversationId field. */
+  conversationId: string | null;
   speechState: SpeechSynthesisState;
   speakingMessageId: string | null;
   speechError: string | null;
@@ -22,6 +24,7 @@ type MessageListProps = {
 export function MessageList({
   messages,
   streaming,
+  conversationId,
   speechState,
   speakingMessageId,
   speechError,
@@ -55,6 +58,7 @@ export function MessageList({
                 index === messages.length - 1 &&
                 message.role === "assistant"
               }
+              conversationId={conversationId}
               speechSupported={speechSupported}
               speechState={speechState}
               speakingMessageId={speakingMessageId}

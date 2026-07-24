@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { useSpeechSynthesis } from "@/hooks/use-speech-synthesis";
 import { clearConversation, createConversation } from "@/lib/chat/actions";
 import {
-  JOURNEY_SUGGESTION_MARKER,
-  parseJourneySuggestionPayload,
+  ACTION_MARKER,
+  parseActionEnvelope,
   safeRenderLength,
   type ChatMessage,
 } from "@/lib/chat/types";
@@ -121,14 +121,14 @@ export function ChatWindow({
           accumulated += decoder.decode(value, { stream: true });
 
           if (markerIndex === -1) {
-            markerIndex = accumulated.indexOf(JOURNEY_SUGGESTION_MARKER);
+            markerIndex = accumulated.indexOf(ACTION_MARKER);
           }
 
           const visible =
             markerIndex === -1
               ? accumulated.slice(
                   0,
-                  safeRenderLength(accumulated, JOURNEY_SUGGESTION_MARKER),
+                  safeRenderLength(accumulated, ACTION_MARKER),
                 )
               : accumulated.slice(0, markerIndex);
 
@@ -142,13 +142,13 @@ export function ChatWindow({
         }
 
         if (markerIndex !== -1) {
-          const suggestion = parseJourneySuggestionPayload(
-            accumulated.slice(markerIndex + JOURNEY_SUGGESTION_MARKER.length),
+          const actions = parseActionEnvelope(
+            accumulated.slice(markerIndex + ACTION_MARKER.length),
           );
-          if (suggestion) {
+          if (actions && actions.length > 0) {
             setMessages((prev) =>
               prev.map((message) =>
-                message.id === assistantId ? { ...message, suggestion } : message,
+                message.id === assistantId ? { ...message, actions } : message,
               ),
             );
           }
@@ -247,6 +247,7 @@ export function ChatWindow({
       <MessageList
         messages={messages}
         streaming={streaming}
+        conversationId={convId}
         speechState={speechState}
         speakingMessageId={speakingMessageId}
         speechError={speechError}
